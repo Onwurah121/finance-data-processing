@@ -1,0 +1,95 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        Int       @id             @default(autoincrement())
+  email     String    @unique         @db.VarChar(255)
+  fullName  String    @db.VarChar(255) @map("full_name")
+  password  String    @db.VarChar(255)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt      @map("updated_at")
+  isDeleted Boolean   @default(false)     @map("is_deleted")
+  isDeletedAt DateTime?                    @map("is_deleted_at")
+
+  roleId    Int?        @map("role_id")
+  role      Role?       @relation(fields: [roleId], references: [id])
+
+  @@map("users")
+}
+
+model Role {
+  id        Int      @id             @default(autoincrement())
+  name      String   @unique         @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  users     User[]
+
+  @@map("roles")
+  rolePermissions RolePermission[]
+}
+
+model Permissions {
+  id        Int      @id             @default(autoincrement())
+  code      String   @unique         @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  @@map("permissions")
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  id            Int         @id             @default(autoincrement())
+  roleId        Int         @map("role_id")
+  permissionId  Int         @map("permission_id")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt      @map("updated_at")
+
+  role          Role        @relation(fields: [roleId], references: [id])
+  permission    Permissions @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model TransactionEntryCategory {
+  id        Int      @id             @default(autoincrement())
+  name      String   @unique         @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  @@map("transaction_entry_categories")
+  transactionEntries TransactionEntry[]
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+model TransactionEntry {
+  id          Int             @id                 @default(autoincrement())
+  type        TransactionType                     @default(INCOME)
+  amount      String          @db.VarChar(255)    @default("0")
+  description String?         @db.VarChar(255)
+  date        DateTime
+  createdAt   DateTime        @default(now())     @map("created_at")
+  updatedAt   DateTime        @updatedAt          @map("updated_at")
+
+  categoryId  Int             @map("category_id")
+  category    TransactionEntryCategory            @relation(fields: [categoryId], references: [id])
+
+  @@map("transaction_entries")
+}

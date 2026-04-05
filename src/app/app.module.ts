@@ -1,0 +1,55 @@
+import { Module } from '@nestjs/common';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { AppController } from './controllers/app.controller';
+import { AppService } from './services/app.service';
+import { AuthModule } from '../auth/auth.module';
+import { CategoryModule } from '../category/category.module';
+import { DashboardModule } from '../dashboard/dashboard.module';
+import { DatabaseModule } from '../database/database.module';
+import { PermissionModule } from '../permission/permission.module';
+import { TransactionModule } from '../transaction/transaction.module';
+import { UserModule } from '../user/user.module';
+import {
+  GlobalExceptionFilter,
+  JwtAuthGuard,
+  PrismaExceptionFilter,
+  TransformInterceptor,
+} from '../common';
+import { PermissionsGuard } from '../common/guards/permissions.guard';
+
+@Module({
+  imports: [DatabaseModule, AuthModule, PermissionModule, UserModule, TransactionModule, CategoryModule, DashboardModule],
+  controllers: [AppController],
+  providers: [
+    AppService,
+    /**
+     * JwtAuthGuard runs first — verifies the JWT on every route.
+     * Use @Public() to opt out.
+     */
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+    /**
+     * PermissionsGuard runs second — checks @Permissions(...) metadata.
+     * Routes without @Permissions() are allowed through automatically.
+     */
+    {
+      provide: APP_GUARD,
+      useClass: PermissionsGuard,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: PrismaExceptionFilter,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TransformInterceptor,
+    },
+  ],
+})
+export class AppModule {}

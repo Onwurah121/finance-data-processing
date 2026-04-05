@@ -16,9 +16,10 @@ export interface StandardResponse<T = unknown> {
 }
 
 @Injectable()
-export class TransformInterceptor<T>
-  implements NestInterceptor<T, StandardResponse<T>>
-{
+export class TransformInterceptor<T> implements NestInterceptor<
+  T,
+  StandardResponse<T>
+> {
   constructor(private readonly reflector: Reflector) {}
 
   intercept(
