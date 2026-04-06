@@ -23,6 +23,7 @@ A RESTful API for managing personal or organizational financial data. Built with
 - [Authorization & Permissions](#authorization--permissions)
 - [Standard Response Format](#standard-response-format)
 - [Error Handling](#error-handling)
+- [Technical Decisions & Trade-offs](#technical-decisions--trade-offs)
 
 ---
 
@@ -368,5 +369,135 @@ All errors (HTTP exceptions and unexpected runtime errors) are handled by the gl
 ```
 
 Prisma-specific errors (e.g. unique constraint violations) are caught by a dedicated `PrismaExceptionFilter` and translated into meaningful HTTP responses.
+
+---
+
+## Technical Decisions & Trade-offs
+
+### Framework — NestJS
+
+**Decision:** NestJS was chosen over plain Express or Fastify.
+
+| Consideration | Detail |
+|---|---|
+| Opinionated structure | Enforces a modular architecture (modules, controllers, services, guards, interceptors, filters) via decorators — the codebase scales predictably. |
+| First-class TypeScript | Built for TypeScript from the ground up; full type-safety across the request/response lifecycle. |
+| DI container | Built-in dependency injection removes manual wiring boilerplate. |
+| Ecosystem | `@nestjs/jwt`, `@nestjs/passport`, `@nestjs/throttler` all drop in without configuration friction. |
+
+**Trade-off:** The decorator/DI pattern adds abstraction that can obscure execution flow for developers unfamiliar with Angular-style architecture. A bare Express server would have less boilerplate for a small project, but would not scale as cleanly.
+
+---
+
+### Database — PostgreSQL
+
+**Decision:** PostgreSQL was chosen over a NoSQL alternative (e.g. MongoDB).
+
+| Consideration | Detail |
+|---|---|
+| ACID compliance | Financial data demands strong consistency guarantees. Every transaction (insert/update/delete) is rolled back on failure — no partial writes. |
+| Relational integrity | Foreign keys between `User → Role`, `RolePermission → Role/Permissions`, and `TransactionEntry → Category` are enforced at the database level, not just the application layer. |
+| Analytical queries | Dashboard aggregations (SUM, GROUP BY month, category breakdown) are expressed naturally in SQL. PostgreSQL's query planner optimises these efficiently. |
+| Index support | Composite index on `(type, categoryId, date)` directly supports the most common dashboard filter patterns. |
+
+**Trade-off:** PostgreSQL requires a running server and migration management. A document store like MongoDB would have a simpler schema-evolution story, but eventual consistency is unacceptable for monetary records.
+
+---
+
+### ORM — Prisma
+
+**Decision:** Prisma was chosen over TypeORM or raw pg.
+
+| Consideration | Detail |
+|---|---|
+| Type-safe queries | The generated client provides fully typed query results — no `as any` casting. |
+| Schema as source of truth | `prisma/schema.prisma` is the single authoritative definition of the data model; the client and migration SQL are derived from it. |
+| Migration tooling | `prisma migrate dev` tracks schema history, generates idempotent SQL, and keeps the generated client in sync automatically. |
+
+**Trade-off:**
+- Prisma does not support all SQL aggregations via its fluent API (e.g. `SUM` across joined fields). The dashboard service uses `$queryRaw` for these cases, which means manual dollars-to-cents conversion (`/ 100`) outside the Prisma extension.
+- The Prisma extension (in `DatabaseService`) that intercepts `create` to multiply amounts by 100 and `findMany` to divide by 100 is invisible to callers — a developer reading a service file cannot see the conversion without knowing the extension exists.
+
+---
+
+### Authentication — Stateless JWT
+
+**Decision:** JWT tokens (via `@nestjs/jwt` + Passport.js) with no server-side session store.
+
+| Consideration | Detail |
+|---|---|
+| Horizontal scalability | Any API instance can verify a token without a shared session store. |
+| Simplicity | No Redis/database session table to maintain. |
+| Standard | Bearer token pattern is well understood and compatible with any HTTP client. |
+
+**Trade-off:** JWTs cannot be invalidated before they expire (short of maintaining a denylist). If a token is compromised, it remains valid until `JWT_EXPIRY` elapses. Mitigation is to keep expiry short and use HTTPS.
+
+---
+
+### Access Control — RBAC via Permission Codes
+
+**Decision:** A flexible `Role → RolePermission → Permissions` model instead of hardcoded role checks.
+
+| Consideration | Detail |
+|---|---|
+| Flexibility | New permissions can be created and assigned to roles at runtime without code changes. |
+| Granularity | Each route declares exactly which permission codes it requires via `@Permissions(...)`. |
+| Auditability | The `RolePermission` table is a clear record of what each role may do. |
+
+**Trade-off:** Every authenticated (non-admin) request hits the database to fetch the user's role permissions. The `PermissionsGuard` short-circuits for `admin` to skip the permission lookup, but all other roles pay this cost. Caching role permissions (e.g. in Redis or a short-lived in-memory map) would eliminate this per-request query.
+
+---
+
+### Monetary Storage — Integer Cents
+
+**Decision:** `TransactionEntry.amount` is stored as an integer (cents) in the database rather than a floating-point `DECIMAL`.
+
+| Consideration | Detail |
+|---|---|
+| Precision | Floating-point arithmetic is inherently imprecise for base-10 fractions. `0.1 + 0.2 !== 0.3` in JavaScript. Integers have no rounding error. |
+| Performance | Integer comparison and summation are cheaper than arbitrary-precision arithmetic. |
+
+**Trade-off:** The conversion (×100 on write, ÷100 on read) is done inside a Prisma extension in `DatabaseService`. This makes it invisible at the service/controller layer. Dashboard `$queryRaw` calls bypass extensions entirely and must divide by 100 manually, creating a hidden contract between the extension and raw SQL code. Any developer adding a new `$queryRaw` aggregation must know this convention.
+
+---
+
+### Rate Limiting — Two Named Throttlers
+
+**Decision:** `@nestjs/throttler` with two named throttlers: `default` (100 req / 60 s globally) and `auth` (5 req / 60 s on the login endpoint).
+
+| Consideration | Detail |
+|---|---|
+| Separation of concerns | The stricter limit on `/auth/login` protects against brute-force credential stuffing without penalising normal API usage. |
+| Declarative | Per-route overrides are a single decorator (`@Throttle({ auth: { ... } })`) rather than custom middleware. |
+| Zero infrastructure | The default in-memory store requires no additional dependencies. |
+
+**Trade-off:** The in-memory throttle store is local to each process — rate-limit counters are lost on restart and are not shared across multiple instances. For a multi-instance production deployment, the throttler storage should be replaced with a Redis adapter (`ThrottlerStorageRedisService`).
+
+---
+
+### Global Guard / Filter / Interceptor Pattern
+
+**Decision:** `ThrottlerGuard`, `JwtAuthGuard`, and `PermissionsGuard` are registered as global `APP_GUARD` providers (in that order). `TransformInterceptor`, `GlobalExceptionFilter`, and `PrismaExceptionFilter` are also global.
+
+| Consideration | Detail |
+|---|---|
+| Uniform behaviour | Every route automatically gets rate-limiting, authentication, permission checks, response wrapping, and error normalisation — no per-controller wiring. |
+| Single source of truth | Security policy is defined once in `AppModule`, not scattered across controllers. |
+
+**Trade-off:** Opting *out* requires explicit decorator escape hatches (`@Public()` to bypass JWT, `@SkipThrottle()` to bypass rate limiting). A developer adding a new public endpoint must remember to add `@Public()` or the endpoint will return 401.
+
+---
+
+### Modular Architecture
+
+**Decision:** Each domain (auth, user, category, transaction, dashboard, permission) is a self-contained NestJS feature module with its own controller, service, and DTOs.
+
+| Consideration | Detail |
+|---|---|
+| Separation of concerns | Business logic for each domain is isolated; changes to `TransactionService` cannot accidentally break `CategoryService`. |
+| Testability | Modules can be individually bootstrapped in tests with only their dependencies. |
+| Scalability | Feature modules can be extracted into separate microservices if the application outgrows a monolith. |
+
+**Trade-off:** The module/controller/service/DTO pattern generates more files and boilerplate than a flat Express router approach. For a very small API this overhead is disproportionate, but it pays off as the codebase grows.
 
 ---
