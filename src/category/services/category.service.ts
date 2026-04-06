@@ -3,9 +3,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
-import { CreateCategoryDto } from './dto/create-category.dto';
-import { UpdateCategoryDto } from './dto/update-category.dto';
+import { DatabaseService } from '../../database/database.service';
+import { CreateCategoryDto } from '../dto/create-category.dto';
+import { UpdateCategoryDto } from '../dto/update-category.dto';
 
 @Injectable()
 export class CategoryService {
@@ -16,9 +16,7 @@ export class CategoryService {
       where: { name: dto.name },
     });
     if (existing) {
-      throw new ConflictException(
-        `Category "${dto.name}" already exists`,
-      );
+      throw new ConflictException(`Category "${dto.name}" already exists`);
     }
     return this.db.client.transactionEntryCategory.create({
       data: { name: dto.name },
@@ -44,10 +42,9 @@ export class CategoryService {
     await this.findOne(id);
 
     if (dto.name) {
-      const conflict =
-        await this.db.client.transactionEntryCategory.findFirst({
-          where: { name: dto.name, NOT: { id } },
-        });
+      const conflict = await this.db.client.transactionEntryCategory.findFirst({
+        where: { name: dto.name, NOT: { id } },
+      });
       if (conflict) {
         throw new ConflictException(`Category "${dto.name}" already exists`);
       }
@@ -57,11 +54,5 @@ export class CategoryService {
       where: { id },
       data: { name: dto.name },
     });
-  }
-
-  async remove(id: number) {
-    await this.findOne(id);
-    await this.db.client.transactionEntryCategory.delete({ where: { id } });
-    return { message: `Category #${id} deleted successfully` };
   }
 }

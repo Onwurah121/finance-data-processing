@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DatabaseService } from '../database/database.service';
-import { CreateTransactionDto } from './dto/create-transaction.dto';
-import { FilterTransactionDto } from './dto/filter-transaction.dto';
-import { UpdateTransactionDto } from './dto/update-transaction.dto';
+import { DatabaseService } from '../../database/database.service';
+import {
+  CreateTransactionDto,
+  FilterTransactionDto,
+  UpdateTransactionDto,
+} from '../dto';
 
 const TRANSACTION_INCLUDE = {
   category: { select: { id: true, name: true } },
@@ -41,7 +43,7 @@ export class TransactionService {
       };
     }
 
-    const [data, total] = await Promise.all([
+    const [data, total] = await this.db.client.$transaction([
       this.db.client.transactionEntry.findMany({
         where,
         include: TRANSACTION_INCLUDE,

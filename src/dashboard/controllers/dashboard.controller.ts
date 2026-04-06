@@ -1,21 +1,13 @@
-import {
-  Controller,
-  DefaultValuePipe,
-  Get,
-  ParseIntPipe,
-  Query,
-  ValidationPipe,
-} from '@nestjs/common';
-import { Permissions } from '../common/decorators/permissions.decorator';
-import { ResponseMessage } from '../common/decorators/response-message.decorator';
-import { DashboardService } from './dashboard.service';
-import { DashboardFilterDto } from './dto/dashboard-filter.dto';
+import { Controller, Get, ParseIntPipe, Query } from '@nestjs/common';
+import { Permissions, ResponseMessage } from '../../common';
+import { DashboardFilterDto } from '../dto/dashboard-filter.dto';
+import { DashboardService } from '../services/dashboard.service';
 
 /**
  * All dashboard endpoints require DASHBOARD_READ permission.
  */
 @Controller('dashboard')
-@Permissions('DASHBOARD_READ')
+@Permissions('dashboard_read')
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
@@ -26,7 +18,7 @@ export class DashboardController {
   @Get('summary')
   @ResponseMessage('Dashboard summary retrieved successfully')
   getSummary(
-    @Query(new ValidationPipe({ whitelist: true, transform: true }))
+    @Query()
     filter: DashboardFilterDto,
   ) {
     return this.dashboardService.getSummary(filter);
@@ -39,7 +31,7 @@ export class DashboardController {
   @Get('categories')
   @ResponseMessage('Category totals retrieved successfully')
   getCategoryTotals(
-    @Query(new ValidationPipe({ whitelist: true, transform: true }))
+    @Query()
     filter: DashboardFilterDto,
   ) {
     return this.dashboardService.getCategoryTotals(filter);
@@ -51,9 +43,7 @@ export class DashboardController {
    */
   @Get('recent')
   @ResponseMessage('Recent activity retrieved successfully')
-  getRecentActivity(
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
-  ) {
+  getRecentActivity(@Query('limit', ParseIntPipe) limit: number) {
     return this.dashboardService.getRecentActivity(limit);
   }
 
@@ -64,7 +54,7 @@ export class DashboardController {
   @Get('trends/monthly')
   @ResponseMessage('Monthly trends retrieved successfully')
   getMonthlyTrends(
-    @Query(new ValidationPipe({ whitelist: true, transform: true }))
+    @Query()
     filter: DashboardFilterDto,
   ) {
     return this.dashboardService.getMonthlyTrends(filter);
@@ -77,7 +67,7 @@ export class DashboardController {
   @Get('trends/weekly')
   @ResponseMessage('Weekly trends retrieved successfully')
   getWeeklyTrends(
-    @Query(new ValidationPipe({ whitelist: true, transform: true }))
+    @Query()
     filter: DashboardFilterDto,
   ) {
     return this.dashboardService.getWeeklyTrends(filter);

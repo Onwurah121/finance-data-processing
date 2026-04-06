@@ -49,11 +49,12 @@ export class AuthService {
       const user = await this.validateUser(dto.email, dto.password);
       if (!user) throw new UnauthorizedException('Invalid email or password');
 
-      const accessToken = this.generateTokens(user.id);
+      const expiresIn = Number(process.env.JWT_EXPIRY ?? 900);
+      const accessToken = this.generateTokens(user.id, expiresIn);
       return {
         accessToken,
         tokenType: 'Bearer',
-        expiresIn: process.env.JWT_EXPIRY ?? '900',
+        expiresIn,
       };
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : 'Unknown error';
@@ -62,12 +63,12 @@ export class AuthService {
     }
   }
 
-  private generateTokens(userId: number) {
+  private generateTokens(userId: number, expiresIn: number) {
     const payload = { sub: userId.toString() };
 
     const accessToken = this.jwtService.sign(payload, {
       secret: process.env.JWT_SECRET,
-      expiresIn: (process.env.JWT_EXPIRY ?? '900') as any,
+      expiresIn,
     });
     return accessToken;
   }

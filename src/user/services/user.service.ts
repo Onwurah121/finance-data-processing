@@ -120,6 +120,13 @@ export class UserService {
     });
   }
 
+  async findAllRoles() {
+    return this.db.client.role.findMany({
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, createdAt: true },
+    });
+  }
+
   private async ensureRoleExists(id: number) {
     const role = await this.db.client.role.findUnique({ where: { id } });
     if (!role) throw new NotFoundException(`Role #${id} not found`);

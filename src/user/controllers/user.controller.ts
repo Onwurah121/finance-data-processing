@@ -73,6 +73,13 @@ export class UserController {
     return this.userService.remove(id);
   }
 
+  @Get('roles/all')
+  @Permissions('user_read')
+  @ResponseMessage('Roles retrieved successfully')
+  findAllRoles() {
+    return this.userService.findAllRoles();
+  }
+
   @Patch('role/:id')
   @Permissions('user_update')
   @ResponseMessage('User role assigned successfully')

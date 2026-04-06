@@ -10,14 +10,15 @@ import {
   Patch,
   Post,
   Query,
-  ValidationPipe,
 } from '@nestjs/common';
-import { Permissions } from '../common/decorators/permissions.decorator';
-import { ResponseMessage } from '../common/decorators/response-message.decorator';
-import { CreateTransactionDto } from './dto/create-transaction.dto';
-import { FilterTransactionDto } from './dto/filter-transaction.dto';
-import { UpdateTransactionDto } from './dto/update-transaction.dto';
-import { TransactionService } from './transaction.service';
+import { TransactionService } from '../services/transaction.service';
+import { ResponseMessage } from '../../common';
+import { Permissions } from '../../common';
+import {
+  CreateTransactionDto,
+  FilterTransactionDto,
+  UpdateTransactionDto,
+} from '../dto';
 
 /**
  * Permission codes:
@@ -30,11 +31,11 @@ import { TransactionService } from './transaction.service';
 export class TransactionController {
   constructor(private readonly transactionService: TransactionService) {}
 
-  @Post()
-  @Permissions('TRANSACTION_CREATE')
+  @Post('create')
+  @Permissions('transaction_create')
   @ResponseMessage('Transaction created successfully')
   create(
-    @Body(new ValidationPipe({ whitelist: true, transform: true }))
+    @Body()
     dto: CreateTransactionDto,
   ) {
     return this.transactionService.create(dto);
@@ -43,36 +44,36 @@ export class TransactionController {
   /**
    * GET /transactions?type=INCOME&categoryId=1&dateFrom=2026-01-01&dateTo=2026-04-05&page=1&limit=20
    */
-  @Get()
-  @Permissions('TRANSACTION_READ')
+  @Get('all')
+  @Permissions('transaction_read')
   @ResponseMessage('Transactions retrieved successfully')
   findAll(
-    @Query(new ValidationPipe({ whitelist: true, transform: true }))
+    @Query()
     filter: FilterTransactionDto,
   ) {
     return this.transactionService.findAll(filter);
   }
 
-  @Get(':id')
-  @Permissions('TRANSACTION_READ')
+  @Get('view/:id')
+  @Permissions('transaction_read')
   @ResponseMessage('Transaction retrieved successfully')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.transactionService.findOne(id);
   }
 
-  @Patch(':id')
-  @Permissions('TRANSACTION_UPDATE')
+  @Patch('update/:id')
+  @Permissions('transaction_update')
   @ResponseMessage('Transaction updated successfully')
   update(
     @Param('id', ParseIntPipe) id: number,
-    @Body(new ValidationPipe({ whitelist: true, transform: true }))
+    @Body()
     dto: UpdateTransactionDto,
   ) {
     return this.transactionService.update(id, dto);
   }
 
-  @Delete(':id')
-  @Permissions('TRANSACTION_DELETE')
+  @Delete('delete/:id')
+  @Permissions('transaction_delete')
   @HttpCode(HttpStatus.OK)
   @ResponseMessage('Transaction deleted successfully')
   remove(@Param('id', ParseIntPipe) id: number) {

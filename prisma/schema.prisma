@@ -91,5 +91,9 @@ model TransactionEntry {
   categoryId  Int             @map("category_id")
   category    TransactionEntryCategory            @relation(fields: [categoryId], references: [id])
 
+  @@index([date],                      map: "idx_transaction_entries_date")
+  @@index([type],                      map: "idx_transaction_entries_type")
+  @@index([categoryId],                map: "idx_transaction_entries_category_id")
+  @@index([type, categoryId, date],    map: "idx_transaction_entries_type_category_date")
   @@map("transaction_entries")
 }
