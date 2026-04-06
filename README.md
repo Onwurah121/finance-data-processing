@@ -23,7 +23,6 @@ A RESTful API for managing personal or organizational financial data. Built with
 - [Authorization & Permissions](#authorization--permissions)
 - [Standard Response Format](#standard-response-format)
 - [Error Handling](#error-handling)
-- [Testing](#testing)
 
 ---
 
@@ -191,7 +190,13 @@ Request body:
 Response `data`:
 ```json
 {
-  "accessToken": "eyJhbGci..."
+    "success": true,
+    "data": {
+        "accessToken": "eyJh.....",
+        "tokenType": "Bearer",
+        "expiresIn": 900
+    },
+    "message": "Login successful"
 }
 ```
 
@@ -365,19 +370,3 @@ All errors (HTTP exceptions and unexpected runtime errors) are handled by the gl
 Prisma-specific errors (e.g. unique constraint violations) are caught by a dedicated `PrismaExceptionFilter` and translated into meaningful HTTP responses.
 
 ---
-
-## Testing
-
-```bash
-# Unit tests
-npm run test
-
-# Unit tests in watch mode
-npm run test:watch
-
-# Test coverage report
-npm run test:cov
-
-# End-to-end tests
-npm run test:e2e
-```
