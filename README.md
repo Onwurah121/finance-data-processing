@@ -120,7 +120,7 @@ DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
 
 # JWT
 JWT_SECRET="your-very-secret-key"
-JWT_EXPIRES_IN="7d"
+JWT_EXPIRY="7d"
 ```
 
 ---
@@ -232,7 +232,7 @@ Response `data`:
 ```json
 {
   "type": "INCOME",
-  "amount": "1500.00",
+  "amount": 1500.00,
   "description": "Freelance payment",
   "date": "2026-04-01",
   "categoryId": 3
